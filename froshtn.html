@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>سیستەمی فرۆشتن</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+<body class="bg-gray-100">
+    <!-- سەرپەڕە -->
+    <nav class="bg-blue-600 text-white p-4">
+        <div class="container mx-auto flex justify-between">
+            <h1 class="text-2xl font-bold">سیستەمی فرۆشتن</h1>
+            <div>
+                <span>بەخێربێیت {{ user.username }}</span>
+                <a href="/logout/" class="ml-4 bg-red-500 px-4 py-2 rounded">چوونەدەرەوە</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mx-auto mt-6 grid grid-cols-3 gap-4">
+        <!-- بەشی چەپ: لیستی کاڵاکان -->
+        <div class="col-span-2 bg-white p-4 rounded shadow">
+            <input type="text" id="search" placeholder="گەڕان بەدوای کاڵا..." class="w-full p-2 border rounded mb-4">
+            
+            <div id="product-list" class="grid grid-cols-3 gap-3">
+                <!-- کاڵاکان لێرەدا بە JavaScript بار دەکرێن -->
+            </div>
+        </div>
+
+        <!-- بەشی ڕاست: سەبەتەی فرۆشتن -->
+        <div class="bg-white p-4 rounded shadow">
+            <h2 class="font-bold text-lg mb-3">سەبەتەی فرۆشتن</h2>
+            <div id="cart-items" class="h-64 overflow-y-auto">
+                <!-- کاڵا زیادکراوەکان لێرەدا دەردەکەون -->
+            </div>
+            
+            <div class="border-t pt-3 mt-3">
+                <div class="flex justify-between"><span>ژێرکۆ:</span><span id="subtotal">0 IQD</span></div>
+                <div class="flex justify-between"><span>باج (15%):</span><span id="tax">0 IQD</span></div>
+                <div class="flex justify-between font-bold text-lg"><span>کۆی گشتی:</span><span id="total">0 IQD</span></div>
+                
+                <button id="checkout-btn" class="w-full bg-green-600 text-white py-3 rounded mt-4 hover:bg-green-700">
+                    تەواوکردنی فرۆشتن
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // JavaScript بۆ کارلێککردن لەگەڵ API
+        let cart = [];
+        
+        // بارکردنی کاڵاکان
+        $.get('/api/products/', function(data) {
+            let html = '';
+            data.forEach(product => {
+                html += `<div class="border p-3 rounded hover:bg-gray-100 cursor-pointer" 
+                            onclick="addToCart(${product.id}, '${product.name}', ${product.sell_price})">
+                            <h3 class="font-bold">${product.name}</h3>
+                            <p>${product.sell_price} IQD</p>
+                            <p class="text-sm text-gray-500">بڕی مخزون: ${product.stock_quantity}</p>
+                        </div>`;
+            });
+            $('#product-list').html(html);
+        });
+
+        // زیادکردن بۆ سەبەتە
+        function addToCart(id, name, price) {
+            let existing = cart.find(item => item.id === id);
+            if (existing) {
+                existing.quantity += 1;
+            } else {
+                cart.push({id, name, price, quantity: 1});
+            }
+            updateCart();
+        }
+
+        // نوێکردنەوەی سەبەتە
+        function updateCart() {
+            let html = '';
+            let subtotal = 0;
+            cart.forEach(item => {
+                subtotal += item.price * item.quantity;
+                html += `<div class="flex justify-between border-b py-2">
+                            <span>${item.name} x ${item.quantity}</span>
+                            <span>${item.price * item.quantity} IQD</span>
+                            <button onclick="removeFromCart(${item.id})" class="text-red-500">سڕینەوە</button>
+                        </div>`;
+            });
+            $('#cart-items').html(html);
+            
+            let tax = subtotal * 0.15; // 15% باج
+            let total = subtotal + tax;
+            $('#subtotal').text(subtotal + ' IQD');
+            $('#tax').text(tax + ' IQD');
+            $('#total').text(total + ' IQD');
+        }
+
+        // لابردنی کاڵا لە سەبەتە
+        function removeFromCart(id) {
+            cart = cart.filter(item => item.id !== id);
+            updateCart();
+        }
+
+        // تەواوکردنی فرۆشتن
+        $('#checkout-btn').on('click', function() {
+            if (cart.length === 0) {
+                alert('تکایە کاڵایەک زیاد بکە!');
+                return;
+            }
+            
+            // ناردنی زانیاری بۆ سەرڤەر
+            $.post('/api/orders/', {
+                items: cart,
+                payment_method: 'cash'
+            }, function(response) {
+                alert('فرۆشتن تەواو بوو! ژمارەی ڕیکۆرد: ' + response.order_number);
+                cart = [];
+                updateCart();
+            });
+        });
+    </script>
+</body>
+</html>
